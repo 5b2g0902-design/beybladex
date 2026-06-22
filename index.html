@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>戰鬥陀螺線上對戰網 | Beyblade Web Arena</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+TC:wght@300;500;700;900&display=swap" rel="stylesheet">
+    <!-- Main Style Sheet -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- 粒子背景或背景炫光 -->
+        <div class="bg-glow bg-glow-1"></div>
+        <div class="bg-glow bg-glow-2"></div>
+
+        <!-- 1. 主選單 (Main Menu) -->
+        <section id="menu-screen" class="screen active">
+            <div class="menu-container">
+                <div class="logo-area">
+                    <h1 class="logo-title">BEYBLADE</h1>
+                    <h2 class="logo-subtitle">戰鬥陀螺線上對戰網</h2>
+                    <p class="logo-tagline">搭配專屬陀螺 • 物理真實對決 • 激爆破裂勝負</p>
+                </div>
+                <div class="menu-buttons">
+                    <button id="btn-enter-workshop" class="btn btn-primary btn-glow">進入陀螺工坊</button>
+                    <button id="btn-enter-lobby" class="btn btn-secondary">進入對戰大廳</button>
+                    <button id="btn-how-to-play" class="btn btn-tertiary">玩法說明</button>
+                </div>
+            </div>
+            <div class="footer-credit">Antigravity AI Lab &copy; 2026</div>
+        </section>
+
+        <!-- 2. 陀螺工坊 (Workshop Screen) -->
+        <section id="workshop-screen" class="screen">
+            <div class="screen-header">
+                <h2>陀螺工坊 <span class="subtitle">WORKSHOP</span></h2>
+                <button class="btn-back btn btn-sm">返回選單</button>
+            </div>
+            <div class="workshop-layout">
+                <!-- 左側：陀螺預覽與自訂顏色 -->
+                <div class="workshop-panel preview-panel card">
+                    <h3>陀螺預覽</h3>
+                    <div class="preview-canvas-container">
+                        <canvas id="workshop-preview-canvas" width="220" height="220"></canvas>
+                        <button id="btn-preview-spin" class="btn-circle-play" title="旋轉測試">
+                            <span class="play-icon">▶</span>
+                        </button>
+                    </div>
+                    
+                    <div class="custom-colors-container">
+                        <h4>外觀顏色自訂</h4>
+                        <div class="color-pickers">
+                            <div class="picker-group">
+                                <label for="color-primary">主色調</label>
+                                <input type="color" id="color-primary" value="#333333">
+                            </div>
+                            <div class="picker-group">
+                                <label for="color-secondary">副色調</label>
+                                <input type="color" id="color-secondary" value="#777777">
+                            </div>
+                            <div class="picker-group">
+                                <label for="color-glow">發光核心</label>
+                                <input type="color" id="color-glow" value="#00ffff">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 中間：零件選擇 -->
+                <div class="workshop-panel parts-panel card">
+                    <div class="parts-tabs">
+                        <button class="tab-btn active" data-tab="layers">結晶輪盤 (Layer)</button>
+                        <button class="tab-btn" data-tab="discs">鋼鐵輪盤 (Disc)</button>
+                        <button class="tab-btn" data-tab="drivers">軸底 (Driver)</button>
+                    </div>
+                    <div class="parts-list-container">
+                        <!-- 零件動態渲染在此 -->
+                        <div id="parts-grid" class="parts-grid"></div>
+                    </div>
+                    <div id="part-info-card" class="part-info-card">
+                        <h4 id="info-part-name">零件名稱</h4>
+                        <p id="info-part-desc">零件詳細說明介紹...</p>
+                        <div id="info-part-ability" class="info-part-ability"></div>
+                    </div>
+                </div>
+
+                <!-- 右側：數值與保存 -->
+                <div class="workshop-panel stats-panel card">
+                    <h3>陀螺配置與屬性</h3>
+                    <div class="name-input-group">
+                        <label for="beyblade-name">命名你的陀螺</label>
+                        <input type="text" id="beyblade-name" placeholder="烈風天馬" maxlength="12">
+                    </div>
+
+                    <!-- 巨神輪盤專用旋轉方向切換 -->
+                    <div id="spin-direction-group" class="spin-direction-group hidden">
+                        <label>旋轉方向設定</label>
+                        <div class="spin-switch">
+                            <button id="spin-dir-right" class="spin-dir-btn active" data-dir="right">右旋 (Clockwise)</button>
+                            <button id="spin-dir-left" class="spin-dir-btn" data-dir="left">左旋 (Counter-CW)</button>
+                        </div>
+                    </div>
+
+                    <div class="stats-bars">
+                        <div class="stat-row">
+                            <div class="stat-label">攻擊力 (Attack)</div>
+                            <div class="stat-bar-bg"><div id="bar-attack" class="stat-bar-fill" style="width: 50%"></div></div>
+                            <div id="val-attack" class="stat-val">10</div>
+                        </div>
+                        <div class="stat-row">
+                            <div class="stat-label">防禦力 (Defense)</div>
+                            <div class="stat-bar-bg"><div id="bar-defense" class="stat-bar-fill" style="width: 50%"></div></div>
+                            <div id="val-defense" class="stat-val">10</div>
+                        </div>
+                        <div class="stat-row">
+                            <div class="stat-label">持久力 (Stamina)</div>
+                            <div class="stat-bar-bg"><div id="bar-stamina" class="stat-bar-fill" style="width: 50%"></div></div>
+                            <div id="val-stamina" class="stat-val">10</div>
+                        </div>
+                        <div class="stat-row">
+                            <div class="stat-label">重　量 (Weight)</div>
+                            <div class="stat-bar-bg"><div id="bar-weight" class="stat-bar-fill" style="width: 50%"></div></div>
+                            <div id="val-weight" class="stat-val">10</div>
+                        </div>
+                        <div class="stat-row">
+                            <div class="stat-label">速　度 (Speed)</div>
+                            <div class="stat-bar-bg"><div id="bar-speed" class="stat-bar-fill" style="width: 50%"></div></div>
+                            <div id="val-speed" class="stat-val">10</div>
+                        </div>
+                        <div class="stat-row">
+                            <div class="stat-label">擊爆抵抗 (Burst Res.)</div>
+                            <div class="stat-bar-bg"><div id="bar-burst" class="stat-bar-fill" style="width: 50%"></div></div>
+                            <div id="val-burst" class="stat-val">10</div>
+                        </div>
+                    </div>
+
+                    <div class="save-actions">
+                        <button id="btn-save-beyblade" class="btn btn-primary btn-block">儲存至本地庫</button>
+                        <div class="share-row">
+                            <button id="btn-export-code" class="btn btn-secondary">匯出代碼</button>
+                            <button id="btn-import-code" class="btn btn-secondary">匯入代碼</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. 對戰大廳 (Lobby Screen) -->
+        <section id="lobby-screen" class="screen">
+            <div class="screen-header">
+                <h2>對戰大廳 <span class="subtitle">BATTLE LOBBY</span></h2>
+                <button class="btn-back btn btn-sm">返回選單</button>
+            </div>
+            
+            <div class="lobby-layout">
+                <!-- 玩家 1 選擇區 -->
+                <div class="lobby-select-box card" id="p1-select-box">
+                    <div class="player-indicator p1-theme">PLAYER 1</div>
+                    <div class="selected-bey-details" id="p1-selected-details">
+                        <!-- 動態填充 -->
+                        <div class="no-selection">尚未選擇陀螺</div>
+                    </div>
+                    <div class="lobby-bey-list-title">選擇陀螺</div>
+                    <div class="lobby-bey-list p1-list"></div>
+                </div>
+
+                <!-- VS 資訊與場地設定 -->
+                <div class="lobby-vs-panel">
+                    <div class="vs-badge">VS</div>
+                    
+                    <div class="battle-settings-card card">
+                        <h3>對戰設定</h3>
+                        
+                        <div class="setting-group">
+                            <label for="opponent-mode">Player 2 控制權</label>
+                            <select id="opponent-mode">
+                                <option value="ai">電腦 AI 玩家</option>
+                                <option value="local">本機雙人 (Local PvP)</option>
+                            </select>
+                        </div>
+                        
+                        <div id="ai-difficulty-group" class="setting-group">
+                            <label for="ai-difficulty">AI 難度/性格</label>
+                            <select id="ai-difficulty">
+                                <option value="balanced">均衡型 AI</option>
+                                <option value="aggressive">狂暴攻擊型 AI</option>
+                                <option value="defensive">中心固守型 AI</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-group">
+                            <label for="arena-style">對戰場地選擇</label>
+                            <select id="arena-style">
+                                <option value="standard">標準圓形碗狀競技場</option>
+                                <option value="extreme">極限深坡競技場 (重力強)</option>
+                                <option value="flat">高速平坦競技場 (重力弱)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button id="btn-start-battle" class="btn btn-primary btn-glow btn-lg btn-block" disabled>開始發射階段</button>
+                </div>
+
+                <!-- 玩家 2 選擇區 -->
+                <div class="lobby-select-box card" id="p2-select-box">
+                    <div class="player-indicator p2-theme">PLAYER 2 / AI</div>
+                    <div class="selected-bey-details" id="p2-selected-details">
+                        <!-- 動態填充 -->
+                        <div class="no-selection">尚未選擇陀螺</div>
+                    </div>
+                    <div class="lobby-bey-list-title">選擇陀螺</div>
+                    <div class="lobby-bey-list p2-list"></div>
+                </div>
+            </div>
+
+            <!-- 代碼上傳/匯入區域 -->
+            <div class="lobby-import-section card">
+                <h3>貼上代碼上傳新陀螺</h3>
+                <div class="import-input-row">
+                    <input type="text" id="lobby-import-input" placeholder="貼上從工坊匯出的陀螺代碼...">
+                    <button id="btn-lobby-upload" class="btn btn-secondary">上傳至大廳</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. 對戰競技場 (Battle Arena Screen) -->
+        <section id="battle-screen" class="screen">
+            <!-- 上方狀態欄 (轉速、爆裂鎖) -->
+            <div class="battle-status-bar">
+                <!-- 玩家 1 狀態 -->
+                <div class="player-status p1-status">
+                    <div class="status-meta">
+                        <span class="status-name" id="hud-p1-name">PLAYER 1</span>
+                        <span class="status-spin-type" id="hud-p1-spin">右旋</span>
+                    </div>
+                    <div class="hud-mode-selector">
+                        戰術：<span id="hud-p1-mode" class="mode-val mode-normal">均衡 (NORMAL)</span>
+                    </div>
+                    <!-- 轉速條 (Stamina) -->
+                    <div class="bar-container">
+                        <div class="bar-label">轉速 (Stamina)</div>
+                        <div class="hud-bar-bg"><div id="hud-p1-stamina" class="hud-bar-fill stamina-fill" style="width: 100%"></div></div>
+                    </div>
+                    <!-- 爆裂值條 (Burst Lock) -->
+                    <div class="bar-container">
+                        <div class="bar-label">爆裂鎖定 (Burst Lock)</div>
+                        <div class="hud-bar-bg"><div id="hud-p1-burst" class="hud-bar-fill burst-fill" style="width: 100%"></div></div>
+                    </div>
+                    <!-- 靈魂氣量條 (Spirit Gauge) -->
+                    <div class="bar-container">
+                        <div class="bar-label">奧義氣量 (Spirit)</div>
+                        <div class="hud-bar-bg"><div id="hud-p1-spirit" class="hud-bar-fill spirit-fill" style="width: 100%"></div></div>
+                    </div>
+                </div>
+
+                <div class="battle-vs-timer">
+                    <div class="battle-phase-text" id="battle-phase-indicator">發射準備</div>
+                    <div class="battle-timer" id="battle-timer-display">00.00</div>
+                </div>
+
+                <!-- 玩家 2 狀態 -->
+                <div class="player-status p2-status">
+                    <div class="status-meta">
+                        <span class="status-name" id="hud-p2-name">PLAYER 2 / AI</span>
+                        <span class="status-spin-type" id="hud-p2-spin">右旋</span>
+                    </div>
+                    <div class="hud-mode-selector">
+                        戰術：<span id="hud-p2-mode" class="mode-val mode-normal">均衡 (NORMAL)</span>
+                    </div>
+                    <!-- 轉速條 -->
+                    <div class="bar-container">
+                        <div class="bar-label">轉速 (Stamina)</div>
+                        <div class="hud-bar-bg"><div id="hud-p2-stamina" class="hud-bar-fill stamina-fill" style="width: 100%"></div></div>
+                    </div>
+                    <!-- 爆裂值條 -->
+                    <div class="bar-container">
+                        <div class="bar-label">爆裂鎖定 (Burst Lock)</div>
+                        <div class="hud-bar-bg"><div id="hud-p2-burst" class="hud-bar-fill burst-fill" style="width: 100%"></div></div>
+                    </div>
+                    <!-- 靈魂氣量條 (Spirit Gauge) -->
+                    <div class="bar-container">
+                        <div class="bar-label">奧義氣量 (Spirit)</div>
+                        <div class="hud-bar-bg"><div id="hud-p2-spirit" class="hud-bar-fill spirit-fill" style="width: 100%"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 中央對戰 Canvas 容器 -->
+            <div class="battle-canvas-container" id="canvas-container">
+                <canvas id="battle-canvas" width="600" height="600"></canvas>
+                
+                <!-- 發射蓄力 UI 疊加層 (Launch Overlay) -->
+                <div id="launch-overlay" class="launch-overlay active">
+                    <div class="launch-guide-box">
+                        <h3 id="launch-prompt-title">Player 1：選擇發射位置與角度</h3>
+                        <p id="launch-prompt-subtitle">拖曳滑鼠左鍵調整發射角度，放開鎖定；在倒數計時中狂按發射鍵（P1: [空白鍵] / P2: [Enter]）以狂暴拉線蓄力！</p>
+                        
+                        <!-- 蓄力槽 -->
+                        <div class="power-bar-wrapper">
+                            <div class="power-bar-label">發射力道：<span id="launch-power-val">0%</span></div>
+                            <div class="power-bar-bg"><div id="launch-power-fill" class="power-bar-fill"></div></div>
+                        </div>
+
+                        <div class="launch-helper-text">
+                            雙擊場地可直接在該位置以預設力道射出
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 戰鬥中操作提示面版 -->
+            <div id="battle-controls-info" class="battle-controls-info card">
+                <h4>戰鬥即時操作指令</h4>
+                <div class="controls-columns">
+                    <div class="control-col">
+                        <strong>Player 1 (左側藍條)</strong>
+                        <span>引導：按住 [W] [A] [S] [D] 微調移位 (每秒耗氣 5%)</span>
+                        <span>衝刺：輕按 [W] [A] [S] [D] 瞬間爆發 (每次耗氣 40%)</span>
+                        <span>模式：按 [Q] 切換戰術模式 (均衡/攻擊/防禦/持久)</span>
+                        <span>奧義：集滿 100% 氣量時，按 [空白鍵] 釋放奧義！</span>
+                    </div>
+                    <div class="control-col" id="p2-control-hint">
+                        <strong>Player 2 (右側粉條)</strong>
+                        <span>引導：按住 [方向鍵 ↑↓←→] 微調移位 (每秒耗氣 5%)</span>
+                        <span>衝刺：輕按 [方向鍵 ↑↓←→] 瞬間爆發 (每次耗氣 40%)</span>
+                        <span>模式：按 [/] 或 [?] 切換戰術模式 (均衡/攻擊/防禦/持久)</span>
+                        <span>奧義：集滿 100% 氣量時，按 [Enter] 釋放奧義！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 對戰控制/返回 -->
+            <div class="battle-footer">
+                <button id="btn-abort-battle" class="btn btn-sm btn-secondary">放棄對戰 (返回大廳)</button>
+            </div>
+        </section>
+
+        <!-- 5. 對戰結算面板 (Results Overlay) -->
+        <div id="results-modal" class="modal">
+            <div class="modal-content card">
+                <h2 class="modal-title">對戰結束 <span class="subtitle">MATCH RESULTS</span></h2>
+                <div class="winner-announcement">
+                    <div class="winner-glow-effect"></div>
+                    <div class="winner-name-title" id="winner-name-display">勝利者</div>
+                    <div class="victory-type" id="victory-type-display">持久勝 (Spin Finish)</div>
+                </div>
+                
+                <div class="results-stats-panel">
+                    <div class="result-row">
+                        <span>戰鬥持續時間</span>
+                        <strong id="result-time">12.34 秒</strong>
+                    </div>
+                    <div class="result-row">
+                        <span>Player 1 剩餘轉速</span>
+                        <strong id="result-p1-stamina">0</strong>
+                    </div>
+                    <div class="result-row">
+                        <span>Player 2 剩餘轉速</span>
+                        <strong id="result-p2-stamina">0</strong>
+                    </div>
+                </div>
+
+                <div class="modal-buttons">
+                    <button id="btn-rematch" class="btn btn-primary btn-glow">重新對戰</button>
+                    <button id="btn-results-lobby" class="btn btn-secondary">返回大廳</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. 玩法說明面板 (How to Play Modal) -->
+        <div id="how-to-play-modal" class="modal">
+            <div class="modal-content card max-w-md">
+                <h2>戰鬥陀螺線上對戰指南</h2>
+                <div class="how-to-scroll">
+                    <h3>1. 陀螺工坊組裝</h3>
+                    <p>在工坊中，您可以搭配三種主要零件：</p>
+                    <ul>
+                        <li><strong>結晶輪盤 (Layer)：</strong>決定攻擊防禦傾向與防爆系數。<strong>極限龍皇 (L-Drago)</strong> 為左旋轉，能對右旋陀螺進行「吸轉」。</li>
+                        <li><strong>鋼鐵輪盤 (Disc)：</strong>影響陀螺重量與碰撞動能。</li>
+                        <li><strong>軸底 (Driver)：</strong>決定摩擦力大小與運動軌跡（如疾速繞圈、原地固守等）。</li>
+                    </ul>
+                    <p>組裝完成後可調整各零件顏色，輸入名字並儲存到大廳庫中。</p>
+
+                    <h3>2. 匯出與匯入分享</h3>
+                    <p>在工坊儲存後，可點選「匯出代碼」複製陀螺代碼分享給朋友。別人可以點「匯入代碼」或是在大廳貼上代碼上傳您的陀螺來和他們對抗！</p>
+
+                    <h3>3. 大廳與發射說明</h3>
+                    <ul>
+                        <li><strong>單人 AI / 雙人對戰：</strong>可自由選擇 Player 1 與 Player 2 (可由電腦 AI 接管，並設定其難度性格)。</li>
+                        <li><strong>瞄準與發射：</strong>進入對戰後為發射準備階段。在 Canvas 上<strong>按住滑鼠左鍵並拖曳</strong>，調整發射方向（拖曳線代表射出的速度向量）。釋放滑鼠後會開始「蓄力計」，在力道條最高點時<strong>再次點擊</strong>即可完美發射！</li>
+                        <li>若是 Local 雙人對戰，將會輪流發射 P1 與 P2。</li>
+                    </ul>
+
+                    <h3>4. 三種獲勝方式</h3>
+                    <ul>
+                        <li><strong style="color: #00ff66;">持久勝 (Spin Finish)：</strong>對手轉速 (Stamina) 先歸零停轉。</li>
+                        <li><strong style="color: #ff33aa;">擊爆勝 (Burst Finish)：</strong>碰撞會扣減爆裂鎖定值，歸零時陀螺會當場爆裂拆解，直接落敗！</li>
+                        <li><strong style="color: #00ccff;">場外勝 (Over Finish)：</strong>場地邊緣有三個缺口，被撞出缺口掉落場外即判定落敗。</li>
+                    </ul>
+                </div>
+                <button id="btn-close-how" class="btn btn-primary btn-block">我懂了，開始玩吧！</button>
+            </div>
+        </div>
+
+        <!-- 匯出/匯入代碼小 Modal -->
+        <div id="code-modal" class="modal">
+            <div class="modal-content card max-w-sm">
+                <h3 id="code-modal-title">陀螺分享代碼</h3>
+                <textarea id="code-modal-text" readonly></textarea>
+                <div class="modal-buttons mt-1">
+                    <button id="btn-copy-code" class="btn btn-primary">複製代碼</button>
+                    <button id="btn-close-code" class="btn btn-secondary">關閉</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Firebase 登入/註冊 Modal -->
+        <div id="login-modal" class="modal">
+            <div class="modal-content card max-w-sm">
+                <h3 id="login-modal-title" style="margin-bottom: 12px; font-weight: 800;">戰士身分驗證 <span class="subtitle" style="font-size: 0.85rem; color: var(--text-muted); font-weight: 300;">WARRIOR AUTH</span></h3>
+                <div class="login-form" style="display: flex; flex-direction: column; gap: 12px; text-align: left;">
+                    <div class="login-input-group" style="display: flex; flex-direction: column; gap: 4px;">
+                        <label for="login-email" style="font-size: 0.8rem; color: var(--text-muted);">電子信箱 Email</label>
+                        <input type="email" id="login-email" class="login-input" placeholder="warrior@example.com" style="width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 6px; color: var(--text-primary); outline: none;">
+                    </div>
+                    <div class="login-input-group" style="display: flex; flex-direction: column; gap: 4px;">
+                        <label for="login-password" style="font-size: 0.8rem; color: var(--text-muted);">密碼 Password</label>
+                        <input type="password" id="login-password" class="login-input" placeholder="請輸入密碼 (6位數以上)" style="width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 6px; color: var(--text-primary); outline: none;">
+                    </div>
+                    <div id="login-message" class="login-message" style="font-size: 0.75rem; min-height: 16px; margin: 2px 0;"></div>
+                    <div class="login-action-buttons" style="display: flex; gap: 8px;">
+                        <button id="btn-do-login" class="btn btn-primary" style="flex: 1;">登入戰場</button>
+                        <button id="btn-do-register" class="btn btn-secondary" style="flex: 1;">註冊新戰士</button>
+                    </div>
+                    <div class="login-divider" style="display: flex; align-items: center; justify-content: center; margin: 4px 0;"><span style="font-size: 0.75rem; color: var(--text-muted); background: var(--bg-dark); padding: 0 8px;">或</span></div>
+                    <button id="btn-anonymous-login" class="btn btn-tertiary" style="width: 100%;">訪客匿名登入</button>
+                </div>
+                <div class="modal-buttons mt-1" style="border-top: 1px solid var(--border-glass); padding-top: 12px; margin-top: 12px;">
+                    <button id="btn-close-login" class="btn btn-secondary btn-block">取消關閉</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 頂部帳號狀態列 -->
+        <div id="user-auth-bar" class="user-auth-bar">
+            <span id="user-display-name" class="user-display-name">訪客戰士 (Guest)</span>
+            <button id="btn-login-trigger" class="btn btn-sm btn-glow" style="padding: 4px 12px; font-size: 0.75rem;">帳號登入</button>
+            <button id="btn-logout" class="btn btn-sm btn-secondary hidden" style="padding: 4px 12px; font-size: 0.75rem;">登出</button>
+        </div>
+    </div>
+
+    <!-- Script imports -->
+    <script src="parts.js"></script>
+    <script src="beyblade.js"></script>
+    <script src="physics.js"></script>
+    <!-- Firebase Compat SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
