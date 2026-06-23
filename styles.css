@@ -127,6 +127,28 @@ body {
     margin-bottom: 24px;
     z-index: 15;
 }
+.screen-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: nowrap;
+    min-width: 0;
+}
+
+.auth-slot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.menu-auth-slot {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 18px;
+}
+
 
 .screen-header h2 {
     font-size: 2rem;
@@ -1584,26 +1606,24 @@ textarea#code-modal-text {
 
 /* Firebase 登入系統相關樣式 */
 .user-auth-bar {
-    position: absolute;
-    top: 20px;
-    right: 30px;
-    display: flex;
+    position: static;
+    display: inline-flex;
     align-items: center;
-    gap: 15px;
-    z-index: 100;
+    gap: 10px;
+    max-width: min(52vw, 420px);
     background: rgba(18, 18, 28, 0.65);
     border: 1px solid var(--border-glass);
-    padding: 6px 14px;
+    padding: 6px 12px;
     border-radius: 20px;
     backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     transition: all 0.3s ease;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), 0 0 10px rgba(0, 204, 255, 0.05);
+    flex: 0 1 auto;
 }
 
 .user-auth-bar.hidden {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-10px);
+    display: none !important;
 }
 
 .user-display-name {
@@ -1611,6 +1631,9 @@ textarea#code-modal-text {
     color: var(--text-primary);
     font-weight: 500;
     letter-spacing: 0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .login-input:focus {
@@ -1631,4 +1654,149 @@ textarea#code-modal-text {
 .login-message.error {
     color: var(--danger);
     text-shadow: 0 0 5px rgba(255, 51, 51, 0.4);
+}
+
+
+/* ========================================================================== 
+   FIX: 戰鬥畫面被切掉修正版
+   原因：body / #app / .screen 使用固定 100vh + overflow:hidden，
+   但戰鬥畫面高度 = HUD + 600px Canvas + 操作說明 + 按鈕，
+   在 768px 高度螢幕會超出，因此被裁切。
+   注意：battle canvas 保持 600x600，不做 CSS 縮放，避免 app.js 的滑鼠發射座標偏移。
+========================================================================== */
+html,
+body {
+    min-height: 100% !important;
+    height: auto !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+}
+
+body {
+    align-items: stretch !important;
+}
+
+#app {
+    min-height: 100vh !important;
+    height: auto !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+}
+
+.screen {
+    min-height: 100vh !important;
+    height: auto !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+}
+
+#battle-screen {
+    min-height: 100vh !important;
+    height: auto !important;
+    padding: 12px 20px 24px !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 12px !important;
+    overflow-y: auto !important;
+}
+
+.battle-status-bar {
+    width: 100% !important;
+    max-width: 1000px !important;
+    grid-template-columns: minmax(260px, 1fr) 150px minmax(260px, 1fr) !important;
+    gap: 12px !important;
+    flex-shrink: 0 !important;
+}
+
+.player-status {
+    padding: 10px 16px !important;
+}
+
+.battle-canvas-container {
+    width: 600px !important;
+    height: 600px !important;
+    flex: 0 0 600px !important;
+    margin: 4px 0 !important;
+}
+
+#battle-canvas {
+    width: 600px !important;
+    height: 600px !important;
+}
+
+.battle-controls-info {
+    margin-top: 0 !important;
+    max-width: 1000px !important;
+    flex-shrink: 0 !important;
+}
+
+.battle-footer {
+    flex-shrink: 0 !important;
+    padding-bottom: 8px !important;
+}
+
+@media (max-height: 850px) {
+    #battle-screen {
+        padding-top: 8px !important;
+        gap: 8px !important;
+    }
+
+    .player-status {
+        padding: 8px 14px !important;
+    }
+
+    .battle-timer {
+        font-size: 1.45rem !important;
+    }
+
+    .battle-phase-text {
+        font-size: 0.76rem !important;
+    }
+
+    .battle-controls-info {
+        padding: 10px 16px !important;
+        font-size: 0.74rem !important;
+    }
+}
+
+@media (max-width: 760px) {
+    .battle-status-bar {
+        grid-template-columns: 1fr !important;
+        max-width: 600px !important;
+    }
+
+    .p2-status {
+        text-align: left !important;
+        border-right: 1px solid var(--border-glass) !important;
+        border-left: 4px solid var(--neon-pink) !important;
+    }
+
+    .p2-status .hud-bar-fill {
+        float: none !important;
+    }
+
+    .controls-columns {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+}
+
+@media (max-width: 760px) {
+    .screen-header {
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .screen-header-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    .auth-slot {
+        justify-content: flex-start;
+        flex: 1;
+    }
+    .user-auth-bar {
+        max-width: 100%;
+        gap: 8px;
+    }
 }

@@ -5,13 +5,13 @@ class PhysicsEngine {
         this.arenaRadius = arenaRadius;
         
         // 碗狀場地中心吸力係數 (斜坡重力模擬)
-        this.slopeGravity = 45; 
+        this.slopeGravity = 28; // 操作性：降低場地吸力，讓玩家方向控制更明顯 
         
         // 牆壁碰撞彈性係數
-        this.wallRestitution = 0.5;
+        this.wallRestitution = 0.35; // 平衡：牆壁反彈降低，避免連續彈牆爆裂
         
         // 陀螺碰撞彈性係數
-        this.collisionRestitution = 0.75;
+        this.collisionRestitution = 0.55; // 平衡：陀螺碰撞彈性降低，避免一撞飛走
 
         // 競技場出界袋口配置 (Over Finish)
         // 設計三個均勻分佈的凹槽/缺口作為出場點
@@ -149,8 +149,8 @@ class PhysicsEngine {
         if (dist > 5) {
             const pullX = -(bey.x / dist) * this.slopeGravity * (dist / this.arenaRadius);
             const pullY = -(bey.y / dist) * this.slopeGravity * (dist / this.arenaRadius);
-            bey.vx += pullX * dt * 50;
-            bey.vy += pullY * dt * 50;
+            bey.vx += pullX * dt * 26; // 操作性：降低場地自動拉扯
+            bey.vy += pullY * dt * 26; // 操作性：降低場地自動拉扯
         }
 
         // 2. 空氣與地面阻力阻尼 (Linear Damping)
@@ -183,11 +183,11 @@ class PhysicsEngine {
                 const ty = bey.x / dist;
 
                 // 根據速度屬性加成 X-Dash 衝刺速度
-                let dashSpeed = 390 + (effSpeed * 8);
+                let dashSpeed = 255 + (effSpeed * 5); // 平衡：降低 X-Dash 衝刺速度
                 
                 // 德蘭雙劍 (Dran Sword) 特技：X-Dash 速度額外提升 25%
                 if (bey.config.layer === 'dran_sword') {
-                    dashSpeed *= 1.25;
+                    dashSpeed *= 1.10; // 平衡：德蘭雙劍 X-Dash 加成降低
                 }
 
                 // 切向速度分量
@@ -197,8 +197,8 @@ class PhysicsEngine {
                 // 向心斜坡發射分量 (切入中央的衝刺力)
                 const ix = -bey.x / dist;
                 const iy = -bey.y / dist;
-                const vx_inward = ix * 220;
-                const vy_inward = iy * 220;
+                const vx_inward = ix * 150; // 平衡：降低 X-Dash 切入中心力道
+                const vy_inward = iy * 150; // 平衡：降低 X-Dash 切入中心力道
 
                 // 混合向量：沿軌道滑行一段距離直接咬合衝入中心
                 bey.vx = vx_tangent * 0.7 + vx_inward;
@@ -247,8 +247,8 @@ class PhysicsEngine {
 
                     // 撞擊牆壁造成的轉速損耗與爆裂槽損耗
                     const impactForce = Math.abs(velAlongNormal);
-                    bey.stamina -= impactForce * 0.4;
-                    bey.burstLock -= impactForce * 0.08;
+                    bey.stamina -= impactForce * 0.16; // 平衡：撞牆耐力損耗降低
+                    bey.burstLock -= impactForce * 0.025; // 平衡：撞牆爆裂損耗大幅降低
 
                     // 產生少量火花
                     const contactX = bey.x + nx * beyRadius;
@@ -272,7 +272,7 @@ class PhysicsEngine {
     handleBeybladeCollision(b1, b2) {
         const dx = b2.x - b1.x;
         const dy = b2.y - b1.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        const dist = Math.max(0.001, Math.sqrt(dx * dx + dy * dy));
         
         const r1 = 28;
         const r2 = 28;
@@ -305,6 +305,27 @@ class PhysicsEngine {
         const rvy = b2.vy - b1.vy;
         const velAlongNormal = rvx * nx + rvy * ny;
 
+        // [技巧碰撞] 先用碰撞前速度判斷誰是主動撞擊者。
+        // nx, ny 是 b1 指向 b2 的法線：b1 沿 +n 代表主動撞向 b2；b2 沿 -n 代表主動撞向 b1。
+        const b1Approach = Math.max(0, b1.vx * nx + b1.vy * ny);
+        const b2Approach = Math.max(0, -(b2.vx * nx + b2.vy * ny));
+        const approachSum = Math.max(0.001, b1Approach + b2Approach);
+        const b1Initiative = b1Approach / approachSum;
+        const b2Initiative = b2Approach / approachSum;
+        const headOnFactor = Math.min(b1Approach, b2Approach) / Math.max(1, Math.max(b1Approach, b2Approach));
+        const b1Reckless = Math.min(1.0, Math.max(0, (b1Approach - 120) / 210));
+        const b2Reckless = Math.min(1.0, Math.max(0, (b2Approach - 120) / 210));
+
+        // 受到傷害倍率：被對方主動撞到會更痛；但高速硬撞也會反噬自己。
+        let receiveMult1 = 0.88 + b2Initiative * 0.55 + headOnFactor * 0.15;
+        let receiveMult2 = 0.88 + b1Initiative * 0.55 + headOnFactor * 0.15;
+        let selfPunish1 = 1.0 + b1Reckless * (0.35 + headOnFactor * 0.45);
+        let selfPunish2 = 1.0 + b2Reckless * (0.35 + headOnFactor * 0.45);
+        if (b1.tacticalMode === 'defense') selfPunish1 *= 0.82;
+        if (b2.tacticalMode === 'defense') selfPunish2 *= 0.82;
+        if (b1.tacticalMode === 'attack') receiveMult2 *= 1.08;
+        if (b2.tacticalMode === 'attack') receiveMult1 *= 1.08;
+
         // 僅當雙方相對靠近時才處理速度反彈 (避免粘滯)
         if (velAlongNormal < 0) {
             const impulseScalar = -(1 + this.collisionRestitution) * velAlongNormal / (1 / m1 + 1 / m2);
@@ -316,23 +337,24 @@ class PhysicsEngine {
 
             // 碰撞強度
             const rawForce = Math.abs(velAlongNormal);
-            let collisionForce = rawForce * (totalMass / 100);
+            const impactSpeedScale = 0.70 + Math.min(1.65, Math.pow(rawForce / 150, 1.15)); // 拉越遠/衝越快，碰撞越痛
+            let collisionForce = Math.min(8.2, rawForce * (Math.sqrt(totalMass) / 16.5) * impactSpeedScale); // 速度主導傷害，重量只提供柔和加成
 
             // [新增] 碰撞增加雙方奧義氣量 (Spirit)
             if (window.app) {
-                window.app.p1Spirit = Math.min(100, window.app.p1Spirit + collisionForce * 2.2);
-                window.app.p2Spirit = Math.min(100, window.app.p2Spirit + collisionForce * 2.2);
+                window.app.p1Spirit = Math.min(100, window.app.p1Spirit + collisionForce * 1.4); // 平衡：碰撞集氣稍降
+                window.app.p2Spirit = Math.min(100, window.app.p2Spirit + collisionForce * 1.4); // 平衡：碰撞集氣稍降
             }
 
             // [新增] BEYBLADE X 極限衝刺 (X-Dash) 威力加成
             let isXDashImpact = false;
             if (b1.xDashTimer > 0) {
-                collisionForce *= 1.4;
+                collisionForce *= 1.18; // 平衡：X-Impact 威力降低
                 isXDashImpact = true;
                 this.addFloatingText(b1.x, b1.y, "X-IMPACT!!", '#00ccff');
             }
             if (b2.xDashTimer > 0) {
-                collisionForce *= 1.4;
+                collisionForce *= 1.18; // 平衡：X-Impact 威力降低
                 isXDashImpact = true;
                 this.addFloatingText(b2.x, b2.y, "X-IMPACT!!", '#00ccff');
             }
@@ -367,16 +389,39 @@ class PhysicsEngine {
             // 隨機觸發天馬輪盤的「強襲」被動
             let isPegasusStrike1 = false;
             let isPegasusStrike2 = false;
-            if (b1.config.layer === 'pegasus' && Math.random() < 0.25) {
+            if (b1.config.layer === 'pegasus' && Math.random() < 0.15) { // 平衡：天馬強襲機率降低
                 isPegasusStrike1 = true;
-                collisionForce *= 1.8;
+                collisionForce *= 1.25; // 平衡：天馬強襲倍率降低
                 this.addFloatingText(b1.x, b1.y, "PEGASUS STRIKE!", b1.colors.glow);
             }
-            if (b2.config.layer === 'pegasus' && Math.random() < 0.25) {
+            if (b2.config.layer === 'pegasus' && Math.random() < 0.15) { // 平衡：天馬強襲機率降低
                 isPegasusStrike2 = true;
-                collisionForce *= 1.8;
+                collisionForce *= 1.25; // 平衡：天馬強襲倍率降低
                 this.addFloatingText(b2.x, b2.y, "PEGASUS STRIKE!", b2.colors.glow);
             }
+
+            // 主動命中、遠距離拉射/高速衝刺、無腦硬撞提示
+            if (b1Initiative > 0.68 && b1Approach > 90) {
+                this.addFloatingText(b2.x, b2.y - 18, b1Approach > 210 ? "POWER HIT!" : "CLEAN HIT!", b1.colors.glow);
+            }
+            if (b2Initiative > 0.68 && b2Approach > 90) {
+                this.addFloatingText(b1.x, b1.y - 18, b2Approach > 210 ? "POWER HIT!" : "CLEAN HIT!", b2.colors.glow);
+            }
+            if (rawForce > 260) {
+                this.addFloatingText(sparkX, sparkY - 26, "SPEED IMPACT!!", '#ffffff');
+            }
+            if (b1Reckless > 0.55 && selfPunish1 > 1.28) {
+                this.addFloatingText(b1.x, b1.y + 18, "RECOIL!", '#ff8844');
+            }
+            if (b2Reckless > 0.55 && selfPunish2 > 1.28) {
+                this.addFloatingText(b2.x, b2.y + 18, "RECOIL!", '#ff8844');
+            }
+
+            // 高速要更痛，但保留上限避免回到秒殺；反噬上限比受擊上限高，鼓勵別無腦直撞。
+            receiveMult1 = Math.min(1.85, Math.max(0.70, receiveMult1));
+            receiveMult2 = Math.min(1.85, Math.max(0.70, receiveMult2));
+            selfPunish1 = Math.min(2.05, Math.max(0.85, selfPunish1));
+            selfPunish2 = Math.min(2.05, Math.max(0.85, selfPunish2));
 
             // 畫面震動
             this.screenShake = Math.min(10, this.screenShake + collisionForce * 0.15);
@@ -386,8 +431,11 @@ class PhysicsEngine {
             const def1 = b1.stats.defense * (b1.tacticalMode === 'defense' ? 1.3 : 1.0) * (b1.specialMoveActive ? 1.35 : 1.0);
             const def2 = b2.stats.defense * (b2.tacticalMode === 'defense' ? 1.3 : 1.0) * (b2.specialMoveActive ? 1.35 : 1.0);
 
-            let spinLoss1 = (collisionForce * 4.5) * (1.2 - def1 * 0.04);
-            let spinLoss2 = (collisionForce * 4.5) * (1.2 - def2 * 0.04);
+            const defenseMitigation1 = Math.max(0.55, 1.02 - Math.min(0.42, def1 * 0.026));
+            const defenseMitigation2 = Math.max(0.55, 1.02 - Math.min(0.42, def2 * 0.026));
+            const staminaSpeedBonus = 0.90 + Math.min(0.75, rawForce / 360);
+            let spinLoss1 = Math.max(0, (collisionForce * 1.55) * staminaSpeedBonus * defenseMitigation1 * receiveMult1 * selfPunish1);
+            let spinLoss2 = Math.max(0, (collisionForce * 1.55) * staminaSpeedBonus * defenseMitigation2 * receiveMult2 * selfPunish2);
 
             // 判斷旋轉方向交互
             if (b1.spinDirection !== b2.spinDirection) {
@@ -414,8 +462,8 @@ class PhysicsEngine {
                 }
             } else {
                 // 同方向旋轉，撞擊接觸面速度翻倍，摩擦損耗大
-                spinLoss1 *= 1.3;
-                spinLoss2 *= 1.3;
+                spinLoss1 *= 1.1; // 平衡：同向旋轉額外損耗降低
+                spinLoss2 *= 1.1; // 平衡：同向旋轉額外損耗降低
             }
 
             b1.stamina = Math.max(0, b1.stamina - spinLoss1);
@@ -430,8 +478,14 @@ class PhysicsEngine {
             const bRes1 = b1.stats.burstResistance * (b1.tacticalMode === 'defense' ? 1.25 : 1.0);
             const bRes2 = b2.stats.burstResistance * (b2.tacticalMode === 'defense' ? 1.25 : 1.0);
 
-            let burstDmg1 = collisionForce * (atk2 / def1) * (2.2 / bRes1);
-            let burstDmg2 = collisionForce * (atk1 / def2) * (2.2 / bRes2);
+                        // 攻防數值改用柔化公式：高數值有優勢，但不會因為 atk/def 比值爆炸而碾壓。
+            const atkPressureTo1 = 0.75 + (atk2 / Math.max(1, atk2 + def1)) * 0.95;
+            const atkPressureTo2 = 0.75 + (atk1 / Math.max(1, atk1 + def2)) * 0.95;
+            const burstResMitigation1 = Math.max(0.50, 1.08 - Math.min(0.50, bRes1 * 0.035));
+            const burstResMitigation2 = Math.max(0.50, 1.08 - Math.min(0.50, bRes2 * 0.035));
+            const burstSpeedBonus = 0.85 + Math.min(0.85, rawForce / 330); // 拉越遠、衝越快，爆裂傷害越高
+            let burstDmg1 = Math.min(7.8, collisionForce * burstSpeedBonus * atkPressureTo1 * burstResMitigation1 * receiveMult1 * selfPunish1);
+            let burstDmg2 = Math.min(7.8, collisionForce * burstSpeedBonus * atkPressureTo2 * burstResMitigation2 * receiveMult2 * selfPunish2);
 
             // 獅子輪盤被動能力：減免 30% 爆裂鎖定損耗
             if (b1.config.layer === 'leone') {
@@ -514,38 +568,73 @@ class PhysicsEngine {
         ctx.restore();
     }
 
-    // [新增] 鍵盤微引導方向控制 (Steer)
+    // [操作性強化] 鍵盤微引導方向控制 (Steer)
     steerBeyblade(bey, dx, dy, dt) {
         if (bey.isBurst || bey.isOut || bey.isStopped) return;
-        
-        // 微調加速度 (與防禦模式或持久模式相關)
-        let steerAcc = 175;
-        if (bey.tacticalMode === 'defense') steerAcc *= 0.7; // 防守重型，轉向較鈍
-        if (bey.tacticalMode === 'stamina') steerAcc *= 0.9;
-        
+
+        // 依軸底與戰術模式給不同手感：攻擊型靈敏、防禦型較穩、持久型省力但轉向中等。
+        const driverControl = {
+            flat: 1.18,
+            rubber: 1.30,
+            sharp: 0.88,
+            ball: 0.98,
+            flat_x: 1.28,
+            taper_x: 1.12,
+            ball_x: 1.02,
+            needle_x: 0.92
+        };
+
+        let steerAcc = 260 * (driverControl[bey.config.driver] || 1.0);
+        if (bey.tacticalMode === 'attack') steerAcc *= 1.18;
+        if (bey.tacticalMode === 'defense') steerAcc *= 0.82;
+        if (bey.tacticalMode === 'stamina') steerAcc *= 0.95;
+        if (bey.specialMoveActive) steerAcc *= 1.20;
+
         bey.vx += dx * steerAcc * dt;
         bey.vy += dy * steerAcc * dt;
+
+        // 輕微速度上限：保留可控性，避免玩家長按後速度無限堆高。
+        const maxSpeed = bey.tacticalMode === 'attack' ? 340 : (bey.tacticalMode === 'defense' ? 250 : 295);
+        const speed = Math.sqrt(bey.vx * bey.vx + bey.vy * bey.vy);
+        if (speed > maxSpeed) {
+            const scale = maxSpeed / speed;
+            bey.vx *= scale;
+            bey.vy *= scale;
+        }
     }
 
-    // [新增] 鍵盤瞬間爆發衝刺 (Dash)
+    // [操作性強化] 鍵盤瞬間爆發衝刺 (Dash)
     dashBeyblade(bey, dx, dy) {
         if (bey.isBurst || bey.isOut || bey.isStopped) return;
-        
-        const dashSpeed = 290;
-        
-        // 混合當前速度與衝刺方向，使其轉向瞬間極度靈敏，並附加衝量
-        bey.vx = (bey.vx * 0.25) + dx * dashSpeed;
-        bey.vy = (bey.vy * 0.25) + dy * dashSpeed;
 
-        // 產生帥氣的火花粒子與漂浮字
+        // 支援斜向衝刺正規化，避免斜方向比直方向更快。
+        const len = Math.max(0.001, Math.sqrt(dx * dx + dy * dy));
+        dx /= len;
+        dy /= len;
+
+        let dashSpeed = 245;
+        if (bey.tacticalMode === 'attack') dashSpeed = 285;
+        if (bey.tacticalMode === 'defense') dashSpeed = 205;
+        if (bey.tacticalMode === 'stamina') dashSpeed = 225;
+        if (bey.specialMoveActive) dashSpeed *= 1.15;
+
+        // 衝刺不是完全覆蓋速度，而是保留一點原本慣性，手感更像「修正路線 + 爆發」
+        bey.vx = (bey.vx * 0.38) + dx * dashSpeed;
+        bey.vy = (bey.vy * 0.38) + dy * dashSpeed;
+
         this.addFloatingText(bey.x, bey.y, "DASH!!", bey.colors.glow);
-        this.addSparks(bey.x, bey.y, bey.colors.glow, 8);
-        
-        // 輕微晃動畫面
-        this.screenShake = Math.max(this.screenShake, 1.8);
+        this.addSparks(bey.x, bey.y, bey.colors.glow, 10);
+        this.screenShake = Math.max(this.screenShake, 1.6);
+    }
+
+    // [操作性強化] 反向煞車 / 急停微控：未來若 app.js 綁定 Shift，可直接使用。
+    brakeBeyblade(bey, strength = 0.88) {
+        if (bey.isBurst || bey.isOut || bey.isStopped) return;
+        bey.vx *= strength;
+        bey.vy *= strength;
+        this.addSparks(bey.x, bey.y, bey.colors.glow, 3);
     }
 }
-
 // 導出模組 (支援瀏覽器端)
 if (typeof module !== 'undefined') {
     module.exports = { PhysicsEngine };

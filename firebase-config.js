@@ -1,22 +1,35 @@
 // Firebase 串接配置設定檔 (Firebase Configuration)
 // ==========================================
-// 說明：此處為登入系統所需的 Firebase 設定佔位符。
-// 請前往 Firebase Console (https://console.firebase.google.com/) 建立專案，
-// 並在專案設定中新增一個 Web 應用程式，將產生的配置貼至下方對應欄位中。
+// 你需要到 Firebase Console 建立 Web App，並把設定貼到 firebaseConfig。
+// 另外請在 Firebase Console 啟用：Authentication > Google、Firestore Database。
 
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY_PLACEHOLDER",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDFq869qgT6qTtKzRDyVAUe7DIUhQru5WU",
+  authDomain: "blade-5c307.firebaseapp.com",
+  projectId: "blade-5c307",
+  storageBucket: "blade-5c307.firebasestorage.app",
+  messagingSenderId: "540799994045",
+  appId: "1:540799994045:web:68075dfe223bc5ac6e8fd4"
 };
 
-// 初始化 Firebase
+// 初始化 Firebase Compat SDK
 if (typeof firebase !== 'undefined') {
-    firebase.initializeApp(firebaseConfig);
-    console.log("Firebase 模組載入成功。");
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
+
+    // 全域服務，讓 app.js 可以直接使用
+    window.firebaseAuth = firebase.auth();
+    window.firebaseDb = firebase.firestore ? firebase.firestore() : null;
+
+    // 登入狀態盡量保留在瀏覽器，下次開啟仍是登入狀態
+    if (window.firebaseAuth && firebase.auth.Auth.Persistence) {
+        window.firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch((err) => {
+            console.warn("Firebase 登入持久化設定失敗：", err);
+        });
+    }
+
+    console.log("Firebase 模組載入成功。Auth:", !!window.firebaseAuth, "Firestore:", !!window.firebaseDb);
 } else {
-    console.error("無法載入 Firebase SDK。請確保已在 index.html 載入相關 script，並確認網路連線正常。");
+    console.error("無法載入 Firebase SDK。請確認 index.html 已載入 firebase-app-compat.js、firebase-auth-compat.js、firebase-firestore-compat.js，並使用 http://localhost 開啟。不要直接用 file:// 開啟。");
 }

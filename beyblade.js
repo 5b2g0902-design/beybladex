@@ -30,7 +30,7 @@ class Beyblade {
         
         // 物理常數與屬性映射
         this.mass = 50 + (this.stats.weight * 3.5); // 質量，影響碰撞慣性
-        this.maxStamina = 5000 + (this.stats.stamina * 250); // 最大轉速上限 (Stamina)
+        this.maxStamina = 6000 + (this.stats.stamina * 320); // 平衡：提高最大耐力，戰鬥時間拉長 // 最大轉速上限 (Stamina)
         this.stamina = this.maxStamina; // 當前轉速
         
         // 摩擦阻力與軸底類型相關
@@ -38,7 +38,7 @@ class Beyblade {
         this.movementType = driverData.movement; // 'aggressive', 'stationary', 'semi-stationary', 'wild'
         
         // 基礎衰減係數：持久型衰減慢，攻擊型衰減快
-        this.baseDecay = 0.8 + (10 - this.stats.stamina) * 0.15;
+        this.baseDecay = (0.8 + (10 - this.stats.stamina) * 0.15) * 0.75; // 平衡：自然耗損降低
         // 發射後的物理狀態
         this.x = 0;
         this.y = 0;
@@ -47,7 +47,7 @@ class Beyblade {
         this.angle = Math.random() * Math.PI * 2; // 旋轉角度
         
         // 爆裂值 (Burst Lock)
-        this.maxBurstLock = 80 + (this.stats.burstResistance * 6);
+        this.maxBurstLock = 140 + (this.stats.burstResistance * 10); // 平衡：提高爆裂鎖定值，避免一碰就爆
         this.burstLock = this.maxBurstLock;
         
         // 狀態標記
@@ -124,8 +124,8 @@ class Beyblade {
         // 2. 轉速自然耗損 (摩擦力)
         // 平底運動摩擦力大，尖底小；速度快時空氣阻力也較大
         const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-        const decayMultiplier = 1 + (speed * 0.005);
-        this.stamina -= this.baseDecay * decayMultiplier * dt * 16;
+        const decayMultiplier = 1 + (speed * 0.0035); // 平衡：高速時耐力額外耗損降低
+        this.stamina -= this.baseDecay * decayMultiplier * dt * 11; // 平衡：整體耐力消耗降低
         
         if (this.stamina <= 0) {
             this.stamina = 0;
@@ -147,13 +147,13 @@ class Beyblade {
                     // 平底：高速繞場運行。製造向心偏移力。
                     // 軌跡類似外圍大螺旋
                     const angleOffset = Math.atan2(this.y, this.x) + Math.PI / 2;
-                    forceX = Math.cos(angleOffset) * 120 + Math.cos(timeFactor * 3) * 50;
-                    forceY = Math.sin(angleOffset) * 120 + Math.sin(timeFactor * 3) * 50;
+                    forceX = Math.cos(angleOffset) * 70 + Math.cos(timeFactor * 3) * 24; // 操作性：降低自動繞場，讓玩家控制更重要
+                    forceY = Math.sin(angleOffset) * 70 + Math.sin(timeFactor * 3) * 24; // 操作性：降低自動繞場，讓玩家控制更重要
                     break;
                 case 'wild':
                     // 橡膠軸：不規則瘋狂撞擊，像Z字形或星形
-                    forceX = Math.cos(timeFactor * 8 + this.angle) * 350;
-                    forceY = Math.sin(timeFactor * 5 - this.angle) * 350;
+                    forceX = Math.cos(timeFactor * 8 + this.angle) * 190; // 操作性：降低橡膠軸亂衝，避免搶走控制權
+                    forceY = Math.sin(timeFactor * 5 - this.angle) * 190; // 操作性：降低橡膠軸亂衝，避免搶走控制權
                     break;
                 case 'semi-stationary':
                     // 球軸：防禦型。朝向中心緩緩靠近，但偏離中心時有小繞圈
@@ -175,7 +175,7 @@ class Beyblade {
             }
 
             // 施加運動自驅力 (受體力與速度值加成)
-            const drivePower = (this.stats.speed * 1.5) * staminaRatio;
+            const drivePower = (this.stats.speed * 0.95) * staminaRatio; // 操作性：整體自驅力降低，玩家輸入更有感
             this.vx += forceX * drivePower * 0.02 * dt;
             this.vy += forceY * drivePower * 0.02 * dt;
         }
@@ -194,7 +194,7 @@ class Beyblade {
         // 6. 檢查場外淘汰 (超出競技場半徑)
         // 競技場是有邊界的圓。如果出界且未撞牆(即從缺口掉出)，設定為場外
         const distFromCenter = Math.sqrt(this.x * this.x + this.y * this.y);
-        if (distFromCenter > arenaRadius + 20) {
+        if (distFromCenter > arenaRadius + 45) { // 平衡：出界判定放寬，避免擦到口袋就結束
             this.isOut = true;
             this.vx = 0;
             this.vy = 0;

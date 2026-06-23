@@ -38,7 +38,10 @@
         <section id="workshop-screen" class="screen">
             <div class="screen-header">
                 <h2>陀螺工坊 <span class="subtitle">WORKSHOP</span></h2>
-                <button class="btn-back btn btn-sm">返回選單</button>
+                <div class="screen-header-actions">
+                    <div class="auth-slot" aria-label="帳號狀態"></div>
+                    <button class="btn-back btn btn-sm">返回選單</button>
+                </div>
             </div>
             <div class="workshop-layout">
                 <!-- 左側：陀螺預覽與自訂顏色 -->
@@ -139,7 +142,7 @@
                     </div>
 
                     <div class="save-actions">
-                        <button id="btn-save-beyblade" class="btn btn-primary btn-block">儲存至本地庫</button>
+                        <button id="btn-save-beyblade" class="btn btn-primary btn-block">儲存陀螺</button>
                         <div class="share-row">
                             <button id="btn-export-code" class="btn btn-secondary">匯出代碼</button>
                             <button id="btn-import-code" class="btn btn-secondary">匯入代碼</button>
@@ -153,7 +156,10 @@
         <section id="lobby-screen" class="screen">
             <div class="screen-header">
                 <h2>對戰大廳 <span class="subtitle">BATTLE LOBBY</span></h2>
-                <button class="btn-back btn btn-sm">返回選單</button>
+                <div class="screen-header-actions">
+                    <div class="auth-slot" aria-label="帳號狀態"></div>
+                    <button class="btn-back btn btn-sm">返回選單</button>
+                </div>
             </div>
             
             <div class="lobby-layout">
@@ -423,32 +429,26 @@
             <div class="modal-content card max-w-sm">
                 <h3 id="login-modal-title" style="margin-bottom: 12px; font-weight: 800;">戰士身分驗證 <span class="subtitle" style="font-size: 0.85rem; color: var(--text-muted); font-weight: 300;">WARRIOR AUTH</span></h3>
                 <div class="login-form" style="display: flex; flex-direction: column; gap: 12px; text-align: left;">
-                    <div class="login-input-group" style="display: flex; flex-direction: column; gap: 4px;">
-                        <label for="login-email" style="font-size: 0.8rem; color: var(--text-muted);">電子信箱 Email</label>
-                        <input type="email" id="login-email" class="login-input" placeholder="warrior@example.com" style="width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 6px; color: var(--text-primary); outline: none;">
-                    </div>
-                    <div class="login-input-group" style="display: flex; flex-direction: column; gap: 4px;">
-                        <label for="login-password" style="font-size: 0.8rem; color: var(--text-muted);">密碼 Password</label>
-                        <input type="password" id="login-password" class="login-input" placeholder="請輸入密碼 (6位數以上)" style="width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 6px; color: var(--text-primary); outline: none;">
+                    <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.55; text-align: center;">
+                        使用 Google 登入可同步自製陀螺到雲端；也可以用訪客匿名登入，只保留本機遊玩體驗。
                     </div>
                     <div id="login-message" class="login-message" style="font-size: 0.75rem; min-height: 16px; margin: 2px 0;"></div>
-                    <div class="login-action-buttons" style="display: flex; gap: 8px;">
-                        <button id="btn-do-login" class="btn btn-primary" style="flex: 1;">登入戰場</button>
-                        <button id="btn-do-register" class="btn btn-secondary" style="flex: 1;">註冊新戰士</button>
-                    </div>
+                    <button id="btn-google-login" class="btn btn-primary btn-glow" style="width: 100%; background: #ffffff; color: #111; border: 1px solid rgba(255,255,255,0.25);">
+                        使用 Google 登入並同步自製陀螺
+                    </button>
                     <div class="login-divider" style="display: flex; align-items: center; justify-content: center; margin: 4px 0;"><span style="font-size: 0.75rem; color: var(--text-muted); background: var(--bg-dark); padding: 0 8px;">或</span></div>
                     <button id="btn-anonymous-login" class="btn btn-tertiary" style="width: 100%;">訪客匿名登入</button>
                 </div>
-                <div class="modal-buttons mt-1" style="border-top: 1px solid var(--border-glass); padding-top: 12px; margin-top: 12px;">
+<div class="modal-buttons mt-1" style="border-top: 1px solid var(--border-glass); padding-top: 12px; margin-top: 12px;">
                     <button id="btn-close-login" class="btn btn-secondary btn-block">取消關閉</button>
                 </div>
             </div>
         </div>
 
-        <!-- 頂部帳號狀態列 -->
+        <!-- 帳號狀態列：由 app.js 移動到目前畫面標題列的返回按鈕左邊 -->
         <div id="user-auth-bar" class="user-auth-bar">
             <span id="user-display-name" class="user-display-name">訪客戰士 (Guest)</span>
-            <button id="btn-login-trigger" class="btn btn-sm btn-glow" style="padding: 4px 12px; font-size: 0.75rem;">帳號登入</button>
+            <button id="btn-login-trigger" class="btn btn-sm btn-glow" style="padding: 4px 12px; font-size: 0.75rem;">登入</button>
             <button id="btn-logout" class="btn btn-sm btn-secondary hidden" style="padding: 4px 12px; font-size: 0.75rem;">登出</button>
         </div>
     </div>
@@ -460,6 +460,7 @@
     <!-- Firebase Compat SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="app.js"></script>
 </body>

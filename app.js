@@ -139,35 +139,119 @@ class App {
         this.selectLobbyBey(2, this.p2SelectedId);
         this.initFirebaseAuth();
 
+        this.placeAuthBarForScreen(this.currentScreen);
         // 啟動預覽 Canvas 渲染循環
         this.startPreviewLoop();
     }
 
     initFirebaseAuth() {
-        if (typeof firebase === 'undefined') {
+        if (typeof firebase === 'undefined' || !firebase.auth) {
             console.warn("Firebase SDK 未載入，略過驗證監聽。");
             return;
         }
 
-        firebase.auth().onAuthStateChanged((user) => {
+        const auth = firebase.auth();
+
+        // 讓 Google 登入狀態保留在瀏覽器，下次重開仍可保持登入
+        if (firebase.auth.Auth && firebase.auth.Auth.Persistence) {
+            auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch((err) => {
+                console.warn("Firebase 登入持久化設定失敗：", err);
+            });
+        }
+
+        auth.onAuthStateChanged(async (user) => {
             const userNameEl = document.getElementById('user-display-name');
             const loginTriggerEl = document.getElementById('btn-login-trigger');
             const logoutEl = document.getElementById('btn-logout');
 
             if (user) {
-                // 已登入
-                const name = user.isAnonymous ? "訪客戰士 (Guest)" : user.email;
-                userNameEl.textContent = `歡迎，戰士：${name}`;
-                loginTriggerEl.classList.add('hidden');
-                logoutEl.classList.remove('hidden');
+                // Google 登入會有 displayName / email；訪客登入則顯示訪客
+                const name = user.isAnonymous
+                    ? "訪客戰士 (Guest)"
+                    : (user.displayName || user.email || "Google 戰士");
+
+                if (userNameEl) userNameEl.textContent = `歡迎，戰士：${name}`;
+                if (loginTriggerEl) loginTriggerEl.classList.add('hidden');
+                if (logoutEl) logoutEl.classList.remove('hidden');
+
+                // Google 登入後自動載入雲端自製陀螺，並與本機資料合併
+                if (!user.isAnonymous) {
+                    await this.loadCloudBeyblades(true);
+                }
             } else {
-                // 未登入
-                userNameEl.textContent = "訪客戰士 (Guest)";
-                loginTriggerEl.classList.remove('hidden');
-                logoutEl.classList.add('hidden');
+                if (userNameEl) userNameEl.textContent = "訪客戰士 (Guest)";
+                if (loginTriggerEl) loginTriggerEl.classList.remove('hidden');
+                if (logoutEl) logoutEl.classList.add('hidden');
             }
         });
     }
+
+    getCurrentFirebaseUser() {
+        if (typeof firebase === 'undefined' || !firebase.auth) return null;
+        return firebase.auth().currentUser || null;
+    }
+
+    getCloudLibraryRef() {
+        const user = this.getCurrentFirebaseUser();
+        if (!user || user.isAnonymous) return null;
+        if (typeof firebase === 'undefined' || !firebase.firestore) return null;
+        return firebase.firestore()
+            .collection('users')
+            .doc(user.uid)
+            .collection('beybladeData')
+            .doc('library');
+    }
+
+    mergeBeybladeLibraries(localList, cloudList) {
+        const map = new Map();
+        [...(cloudList || []), ...(localList || [])].forEach((bey) => {
+            if (!bey || !bey.config || !bey.colors) return;
+            const key = bey.id || `${bey.name}|${bey.config.layer}|${bey.config.disc}|${bey.config.driver}|${bey.config.spinDirection || 'right'}|${bey.colors.primary}|${bey.colors.secondary}|${bey.colors.glow}`;
+            map.set(key, bey);
+        });
+        return Array.from(map.values());
+    }
+
+    async loadCloudBeyblades(mergeWithLocal = true) {
+        const ref = this.getCloudLibraryRef();
+        if (!ref) return;
+
+        try {
+            const snap = await ref.get();
+            const cloudList = snap.exists && Array.isArray(snap.data().beyblades)
+                ? snap.data().beyblades
+                : [];
+
+            this.customBeyblades = mergeWithLocal
+                ? this.mergeBeybladeLibraries(this.customBeyblades, cloudList)
+                : cloudList;
+
+            localStorage.setItem('beyblade_custom_library', JSON.stringify(this.customBeyblades));
+            this.renderLobbyLists();
+            await this.saveCloudBeyblades(false);
+            console.log(`雲端陀螺庫同步完成，共 ${this.customBeyblades.length} 個自製陀螺。`);
+        } catch (err) {
+            console.error("讀取雲端陀螺庫失敗：", err);
+            alert("讀取雲端陀螺庫失敗。請確認 Firestore 已啟用，且安全規則允許登入使用者讀寫自己的資料。\n" + err.message);
+        }
+    }
+
+    async saveCloudBeyblades(showMessage = false) {
+        const ref = this.getCloudLibraryRef();
+        if (!ref) return;
+
+        try {
+            await ref.set({
+                beyblades: this.customBeyblades,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            if (showMessage) console.log("雲端陀螺庫儲存成功。", this.customBeyblades.length);
+        } catch (err) {
+            console.error("儲存雲端陀螺庫失敗：", err);
+            if (showMessage) alert("儲存雲端陀螺庫失敗：" + err.message);
+        }
+    }
+
 
     // 讀取本地儲存的陀螺
     loadLocalBeyblades() {
@@ -182,11 +266,43 @@ class App {
         }
     }
 
-    // 儲存陀螺至本地
+    // 儲存陀螺至本地；若已登入 Google，會同步到 Firestore 雲端
     saveLocalBeyblades() {
         localStorage.setItem('beyblade_custom_library', JSON.stringify(this.customBeyblades));
         this.renderLobbyLists();
+        this.saveCloudBeyblades(true);
+    }    // 將帳號狀態列放進目前畫面的標題列，避免浮動遮住「返回選單」等按鈕
+    placeAuthBarForScreen(screenId) {
+        const authBar = document.getElementById('user-auth-bar');
+        if (!authBar) return;
+
+        if (screenId === 'battle-screen') {
+            authBar.classList.add('hidden');
+            return;
+        }
+
+        authBar.classList.remove('hidden');
+
+        const headerSlot = document.querySelector(`#${screenId} .auth-slot`);
+        if (headerSlot) {
+            headerSlot.appendChild(authBar);
+            return;
+        }
+
+        // 主選單沒有 screen-header，所以放在主選單容器上方，保持在正常排版中不浮動
+        const menuContainer = document.querySelector('#menu-screen .menu-container');
+        if (menuContainer) {
+            let menuSlot = document.querySelector('#menu-screen .menu-auth-slot');
+            if (!menuSlot) {
+                menuSlot = document.createElement('div');
+                menuSlot.className = 'menu-auth-slot';
+                menuContainer.insertBefore(menuSlot, menuContainer.firstChild);
+            }
+            menuSlot.appendChild(authBar);
+        }
     }
+
+
 
     // 畫面切換
     switchScreen(screenId) {
@@ -196,17 +312,8 @@ class App {
             target.classList.add('active');
             this.currentScreen = screenId;
         }
-
-        // 隱藏/顯示帳號狀態列
-        const authBar = document.getElementById('user-auth-bar');
-        if (authBar) {
-            if (screenId === 'battle-screen') {
-                authBar.classList.add('hidden');
-            } else {
-                authBar.classList.remove('hidden');
-            }
-        }
-
+        // 帳號狀態列改放到目前畫面標題列右側，位於返回按鈕左邊
+        this.placeAuthBarForScreen(screenId);
         // 如果離開戰鬥畫面，停止循環與計時器
         if (screenId !== 'battle-screen') {
             this.stopBattle();
@@ -518,6 +625,32 @@ class App {
             });
         }
 
+
+
+        // Google 登入：登入後會自動同步 Firestore 裡自己的自製陀螺庫
+        const googleLoginBtn = document.getElementById('btn-google-login');
+        if (googleLoginBtn) {
+            googleLoginBtn.addEventListener('click', async () => {
+                if (typeof firebase === 'undefined' || !firebase.auth) {
+                    showMessage('Firebase SDK 未加載，無法使用 Google 登入。');
+                    return;
+                }
+                try {
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    provider.setCustomParameters({ prompt: 'select_account' });
+                    await firebase.auth().signInWithPopup(provider);
+                    showMessage('Google 登入成功！正在同步你的自製陀螺...', true);
+                    await this.loadCloudBeyblades(true);
+                    setTimeout(() => {
+                        if (loginModal) loginModal.classList.remove('active');
+                    }, 800);
+                } catch (err) {
+                    console.error('Google 登入失敗：', err);
+                    showMessage('Google 登入失敗：' + err.message);
+                }
+            });
+        }
+
         // 關閉登入彈窗
         const closeLoginBtn = document.getElementById('btn-close-login');
         if (closeLoginBtn) {
@@ -531,6 +664,7 @@ class App {
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => {
                 if (typeof firebase !== 'undefined') {
+                    this.saveCloudBeyblades(false);
                     firebase.auth().signOut().then(() => {
                         alert('您已登出戰士帳號。');
                     }).catch(err => {
@@ -1309,8 +1443,8 @@ class App {
         }
 
         // 氣量隨時間自然充能
-        this.p1Spirit = Math.min(100, this.p1Spirit + dt * 9.5); // 約 10.5 秒集滿
-        this.p2Spirit = Math.min(100, this.p2Spirit + dt * 9.5);
+        this.p1Spirit = Math.min(100, this.p1Spirit + dt * 14.0); // 操作性：氣量回復加快，讓玩家更常衝刺/放招
+        this.p2Spirit = Math.min(100, this.p2Spirit + dt * 14.0); // 操作性：氣量回復加快
 
         // 執行 AI 智慧決策
         this.updateAiBattleDecisions(dt);
@@ -1326,7 +1460,7 @@ class App {
             p1Dy *= 0.7071;
         }
         if ((p1Dx !== 0 || p1Dy !== 0) && this.p1Spirit > 0) {
-            this.p1Spirit = Math.max(0, this.p1Spirit - dt * 6.5); // 微引導每秒耗氣 6.5%
+            this.p1Spirit = Math.max(0, this.p1Spirit - dt * 3.2); // 操作性：微引導耗氣降低，長按控制更有用
             this.physics.steerBeyblade(this.p1Beyblade, p1Dx, p1Dy, dt);
         }
 
@@ -1343,7 +1477,7 @@ class App {
                 p2Dy *= 0.7071;
             }
             if ((p2Dx !== 0 || p2Dy !== 0) && this.p2Spirit > 0) {
-                this.p2Spirit = Math.max(0, this.p2Spirit - dt * 6.5);
+                this.p2Spirit = Math.max(0, this.p2Spirit - dt * 3.2); // 操作性：微引導耗氣降低
                 this.physics.steerBeyblade(this.p2Beyblade, p2Dx, p2Dy, dt);
             }
         }
@@ -1771,8 +1905,8 @@ class App {
         if (e.code === 'KeyA') p1Dx = -1;
         if (e.code === 'KeyD') p1Dx = 1;
         
-        if ((p1Dx !== 0 || p1Dy !== 0) && this.p1Spirit >= 40) {
-            this.p1Spirit -= 40;
+        if ((p1Dx !== 0 || p1Dy !== 0) && this.p1Spirit >= 28) {
+            this.p1Spirit -= 28; // 操作性：衝刺成本降低
             this.physics.dashBeyblade(this.p1Beyblade, p1Dx, p1Dy);
         }
         
@@ -1783,8 +1917,8 @@ class App {
             if (e.code === 'ArrowLeft') p2Dx = -1;
             if (e.code === 'ArrowRight') p2Dx = 1;
             
-            if ((p2Dx !== 0 || p2Dy !== 0) && this.p2Spirit >= 40) {
-                this.p2Spirit -= 40;
+            if ((p2Dx !== 0 || p2Dy !== 0) && this.p2Spirit >= 28) {
+                this.p2Spirit -= 28; // 操作性：衝刺成本降低
                 this.physics.dashBeyblade(this.p2Beyblade, p2Dx, p2Dy);
             }
         }
